@@ -4,9 +4,9 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field, ConfigDict
 
 
-# -------------------------
+
 # Request Contract
-# -------------------------
+
 
 class InputMetadata(BaseModel):
     """
@@ -28,9 +28,7 @@ class InputRequest(BaseModel):
     metadata: InputMetadata = Field(default_factory=InputMetadata)
 
 
-# -------------------------
 # Response Contract
-# -------------------------
 
 class GenerationPrediction(BaseModel):
     model_config = ConfigDict(extra="forbid")
