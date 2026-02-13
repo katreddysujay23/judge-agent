@@ -1,48 +1,107 @@
+# app/main.py
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+import logging
+import uuid
 
-from app.models import InputRequest, JudgeResponse
+from app.models import InputRequest, JudgeResponse, JudgeErrorResponse
+from app.judge import JudgeAgent
+from app.config import settings
 
+# ---------------------------------------------------------
+# Logging setup
+# ---------------------------------------------------------
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------
+# FastAPI app
+# ---------------------------------------------------------
 app = FastAPI(
     title="Judge Agent API",
     description="Evaluates text and video content for AI-generation likelihood, virality, and distribution analysis.",
-    version="0.1.0",
+    version=settings.app_version,
 )
 
+# ---------------------------------------------------------
+# Instantiate JudgeAgent once at startup
+# ---------------------------------------------------------
+try:
+    judge_agent = JudgeAgent()
+except Exception as e:
+    logger.exception("Failed to initialize JudgeAgent: %s", str(e))
+    judge_agent = None
 
-@app.get("/health")
+# ---------------------------------------------------------
+# Health Endpoint
+# ---------------------------------------------------------
+@app.get("/health", summary="Health check endpoint")
 def health() -> dict:
     return {"status": "ok"}
 
 
-@app.post("/evaluate", response_model=JudgeResponse)
-def evaluate(request: InputRequest) -> JudgeResponse:
+# ---------------------------------------------------------
+# Evaluate Endpoint
+# ---------------------------------------------------------
+@app.post(
+    "/evaluate",
+    response_model=JudgeResponse,
+    responses={
+        400: {"model": JudgeErrorResponse},
+        500: {"model": JudgeErrorResponse},
+    },
+    summary="Evaluate content for AI-generation, virality, and distribution analysis",
+)
+def evaluate(request: InputRequest):
     """
-    Phase 1 stub endpoint.
-    Full JudgeAgent logic will be implemented in Phase 2.
+    Evaluates text or video content using the JudgeAgent.
+
+    - Strict schema validation
+    - Defensive LLM handling
+    - Retry-once policy
+    - Controlled failure surface
     """
-    # Temporary placeholder response to validate contract wiring.
-    # This ensures FastAPI + Pydantic integration is correct early.
-    return JudgeResponse(
-        generation_prediction={
-            "label": "AI",
-            "confidence": 0.5,
-            "reasoning": "Stub response – evaluation logic not yet implemented."
-        },
-        virality={
-            "score": 50,
-            "confidence": 0.5,
-            "reasoning": "Stub response – evaluation logic not yet implemented."
-        },
-        distribution_analysis={
-            "likely_audiences": [
-                {
-                    "community": "General social media users",
-                    "why": "Placeholder audience for contract validation."
-                }
-            ],
-            "reasoning": "Stub response – evaluation logic not yet implemented."
-        },
-        meta_explanation="Phase 1 contract validation response."
-    )
+
+    request_id = str(uuid.uuid4())
+
+    if judge_agent is None:
+        return JudgeErrorResponse(
+            error="initialization_failed",
+            detail="JudgeAgent failed to initialize.",
+            request_id=request_id,
+        )
+
+    try:
+        metadata_dict = request.metadata.model_dump() if request.metadata else None
+
+        if request.type == "text":
+            return judge_agent.evaluate_text(
+                content=request.content,
+                metadata=metadata_dict,
+            )
+
+        if request.type == "video":
+            return judge_agent.evaluate_video(
+                content=request.content,
+                metadata=metadata_dict,
+            )
+
+        return JudgeErrorResponse(
+            error="invalid_type",
+            detail="Invalid type. Must be 'text' or 'video'.",
+            request_id=request_id,
+        )
+
+    except RuntimeError:
+        return JudgeErrorResponse(
+            error="evaluation_failed",
+            detail="LLM output invalid after retry or upstream call failed.",
+            request_id=request_id,
+        )
+
+    except Exception as e:
+        logger.exception("Unexpected server error: %s", str(e))
+        return JudgeErrorResponse(
+            error="unexpected_error",
+            detail="Unexpected server error.",
+            request_id=request_id,
+        )
