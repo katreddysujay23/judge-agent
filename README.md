@@ -1,155 +1,64 @@
-Here is the final README.md content — ready to copy-paste directly into your repository.
-
-Judge Agent — Structured Content Evaluation Engine
+Judge Agent — Structured Content Evaluation
 Overview
 
 This project implements a modular Judge Agent that evaluates text and video content across four dimensions:
 
-AI-generation likelihood
+AI-generated vs Human-generated prediction
 
-Virality potential (0–100)
+Virality score (0–100)
 
-Audience distribution analysis
+Distribution analysis (audiences + justification)
 
-Structured reasoning with confidence scoring
+Structured reasoning with confidence
 
-The system uses rubric-driven LLM evaluation with strict schema validation, controlled retry logic, and transcript-first video normalization. It is built with FastAPI and designed to demonstrate structured reasoning, defensive engineering, and clarity under ambiguity.
-
-What Was Built
-FastAPI Service
-
-POST /evaluate
-
-Version: 1.0.0
-
-Swagger documentation enabled
-
-Strict request and response schema validation
-
-No raw exception leakage
-
-Modular JudgeAgent
-
-Encapsulates:
-
-Prompt construction (rubric-driven)
-
-LLM invocation
-
-Deterministic JSON parsing
-
-Pydantic validation (extra="forbid")
-
-Retry-once repair strategy
-
-Structured error responses
-
-Business logic is isolated from the API layer.
-
-Transcript-First Video Handling
-
-Video input is normalized via transcript before evaluation.
-
-This decision keeps the evaluation pipeline unified and avoids multimodal overengineering within the 6-hour implementation constraint. The architecture allows clean extension to multimodal analysis later.
-
-Strict Schema Enforcement
-
-Output constraints include:
-
-virality.score → integer between 0 and 100
-
-confidence → float between 0.0 and 1.0
-
-label → "AI" or "Human"
-
-Audience list size bounded
-
-extra="forbid" on all response models
-
-Malformed outputs trigger a controlled retry. Persistent failures return a structured error response — never a crash.
-
-Offline Deterministic Mode
-
-OPENAI_OFFLINE_MODE enables development and testing without external API calls.
-This prevents flaky behavior and improves reproducibility.
-
-Minimal High-Signal Tests
-
-Tests cover:
-
-Schema validation
-
-Retry logic
-
-API endpoint behavior
-
-Error handling
-
-All tests passing.
+The objective was to demonstrate structured reasoning, disciplined system design, and defensive engineering within a 6-hour constraint — not to maximize detection accuracy.
 
 Architecture
-Input (Text or Video)
-    ↓
-Video Normalization (Transcript-first)
-    ↓
+Input (Text / Video)
+        ↓
+Transcript Normalization (video)
+        ↓
 JudgeAgent
-    ↓
+        ↓
 LLM Structured Evaluation
-    ↓
+        ↓
 JSON Validation (Pydantic)
-    ↓
-Retry if malformed
-    ↓
+        ↓
+Retry-once (if malformed)
+        ↓
 Structured API Response
 
-Design Intent
+
+Design Principles
 
 Clear separation of concerns
 
-Deterministic output contracts
+Strict output contracts (extra="forbid")
+
+Bounded numeric validation
 
 Controlled failure handling
 
-Extensible evaluation core
+Extensible but minimal
 
-The API layer contains no evaluation logic.
-The JudgeAgent owns orchestration.
-Validation is enforced before any response leaves the system.
+Evaluation Approach
+AI vs Human (Heuristic)
 
-Evaluation Logic
-1. AI vs Human Detection
+Signals considered:
 
-Heuristic, explainable reasoning — not statistical classification.
+Structural symmetry vs narrative messiness
 
-AI-indicative signals
+Over-coherence vs lived detail
 
-Structural symmetry
+Generic phrasing vs idiosyncratic voice
 
-Over-coherence
+Emotional neutrality vs inconsistency
 
-Generic phrasing
+Output includes label, reasoning, and bounded confidence (0.0–1.0).
 
-Polished neutrality
+Virality (0–100)
 
-Lack of lived detail
-
-Human-indicative signals
-
-Personal anecdotes
-
-Emotional inconsistency
-
-Idiosyncratic phrasing
-
-Imperfect structure
-
-Cultural specificity
-
-Output includes label, confidence, and reasoning transparency.
-
-2. Virality Scoring (0–100)
-
-Derived from a defined rubric including:
+Derived from rubric dimensions:
 
 Emotional intensity
 
@@ -163,144 +72,50 @@ Clarity
 
 Controversy potential
 
-The model produces:
+Produces: score + confidence + explanation.
 
-Numeric score
+No engagement data is used — inference is semantic.
 
-Confidence
+Distribution Analysis
 
-Explicit reasoning
+Infers likely communities based on topic, tone, and metadata.
+Each audience segment includes explicit justification.
 
-No historical engagement data is used. Scoring is inference-based.
+Reliability & Defensive Engineering
 
-3. Distribution Analysis
+JSON-only prompt enforcement
 
-Infers likely audience segments based on:
-
-Topic
-
-Tone
-
-Cultural signals
-
-Optional platform metadata
-
-Each audience segment includes:
-
-community
-
-why (explicit justification)
-
-A summary reasoning field explains the overall distribution logic.
-
-4. Confidence Modeling
-
-Each dimension includes:
-
-confidence: float (0.0–1.0)
-
-
-Confidence reflects:
-
-Strength of detected signals
-
-Presence of ambiguity
-
-Mixed indicators
-
-It does not represent empirical calibration.
-
-Design Decisions & Tradeoffs
-Transcript-First Video Evaluation
-
-Video is evaluated primarily via transcript.
-
-Rationale:
-
-AI detection is largely linguistic.
-
-Virality drivers are primarily semantic.
-
-Full multimodal CV exceeds the 6-hour scope.
-
-The architecture allows multimodal extension without refactoring.
-
-Heuristic AI Detection
-
-No stylometric classifier or dataset-based model was implemented.
-
-Tradeoff:
-
-Higher explainability
-
-No statistical accuracy guarantee
-
-Aligned with the assignment’s focus on reasoning under ambiguity.
-
-LLM-Based Structured Scoring
-
-An LLM generates evaluations under a strict output contract.
-
-Risk: Free-form output drift
-Mitigation: JSON-only enforcement + retry repair strategy
-
-Strict JSON Enforcement + Retry Strategy
-
-Pipeline:
-
-Prompt requires JSON-only output
-
-json.loads() parsing
+Deterministic parsing
 
 Pydantic schema validation
 
-Retry once with repair prompt if malformed
+Retry-once repair strategy
 
-If still invalid:
+Structured error responses (no stack trace leakage)
 
-Return structured JudgeErrorResponse
+Offline deterministic mode for dev/test stability
 
-No stack traces
+Health endpoint for production readiness
 
-No raw HTTP exceptions
+Key Tradeoffs
 
-This reflects defensive engineering practices.
+Transcript-first video evaluation
+Chosen to respect the 6-hour scope while preserving semantic signal.
+Architecture allows multimodal extension later.
 
-Offline Deterministic Mode
-
-Prevents:
-
-Flaky tests
-
-API instability during development
-
-Non-deterministic CI behavior
-
-Supports controlled iteration.
+Heuristic AI detection
+Explainable but not statistically calibrated.
+Aligned with ambiguity-focused evaluation.
 
 Assumptions
 
-AI detection is heuristic and probabilistic.
+AI detection is probabilistic.
 
-Virality is inferred from linguistic and emotional features.
+Virality is inferred linguistically, not empirically.
 
-Video evaluation relies primarily on transcript semantics.
+Transcript-level analysis is sufficient for initial video evaluation.
 
-Audience segmentation is semantic inference, not demographic ground truth.
-
-Confidence scores reflect model certainty, not statistical validation.
-
-Cultural bias may influence interpretation.
-
-Constraints
-
-6-hour scoped implementation
-
-Designed to demonstrate reasoning under ambiguity
-
-Focused on clarity over complexity
-
-Extensible but intentionally minimal
+Confidence reflects model certainty, not calibration.
 
 How to Run
 git clone <repo-url>
@@ -308,81 +123,27 @@ cd judge-agent
 
 python3 -m venv venv
 source venv/bin/activate
-
 pip install -r requirements.txt
 
 uvicorn app.main:app --reload
 
 
-Open:
+Open: http://127.0.0.1:8000/docs
 
-http://127.0.0.1:8000/docs
+Future Extensions (With More Time)
 
-Example Request
-{
-  "type": "text",
-  "content": "AI is about to replace every job in the next 5 years. No one is ready.",
-  "metadata": {
-    "platform": "twitter"
-  }
-}
+Multimodal frame sampling
 
-Example Response (Shape)
-{
-  "generation_prediction": {
-    "label": "AI",
-    "confidence": 0.74,
-    "reasoning": "..."
-  },
-  "virality": {
-    "score": 81,
-    "confidence": 0.69,
-    "reasoning": "..."
-  },
-  "distribution_analysis": {
-    "likely_audiences": [
-      {
-        "community": "Tech Twitter",
-        "why": "..."
-      }
-    ],
-    "reasoning": "..."
-  },
-  "meta_explanation": "..."
-}
+Stylometric ensemble detection
 
-Future Improvements
+Calibration against labeled data
 
-Multimodal frame sampling for richer video evaluation
+Cost-aware inference routing
 
-Stylometric AI-detection ensemble
+Observability dashboards (latency, retries, drift)
 
-Calibration against labeled dataset
-
-Cost-aware model routing
-
-Response caching for repeated content
-
-Batch evaluation endpoint
-
-Observability dashboard (latency, retries, model drift)
-
-Confidence calibration layer
-
-All improvements integrate cleanly into the current architecture.
+Batch evaluation endpoints
 
 Closing
 
-This implementation prioritizes:
-
-Explicit reasoning
-
-Clear contracts
-
-Defensive validation
-
-Controlled scope
-
-Extensibility
-
-It is intentionally structured to demonstrate engineering judgment under ambiguity rather than maximize model complexity.
+This implementation prioritizes clarity, contract discipline, controlled scope, and reasoning transparency under ambiguity.
